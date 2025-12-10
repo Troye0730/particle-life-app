@@ -1,6 +1,7 @@
 package com.particle_life.app;
 
 import org.lwjgl.glfw.GLFWVidMode;
+import org.lwjgl.opengl.GL;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
@@ -27,6 +28,13 @@ public class App {
 
     private void launch(String title, boolean fullscreen) {
         init(title, fullscreen);
+
+        // This line is critical for LWJGL's interoperation with GLFW's
+        // OpenGL context, or any context that is managed externally.
+        // LWJGL detects the context that is current in the current thread,
+        // creates the GLCapabilities instance and makes the OpenGL
+        // bindings available for use.
+        GL.createCapabilities();
 
         setCallbacks();
 
@@ -83,6 +91,12 @@ public class App {
         if (window == NULL) {
             throw new IllegalStateException("Failed to create the GLFW window");
         }
+
+        // Make the OpenGL context current
+        glfwMakeContextCurrent(window);
+
+        // Enable v-sync
+        glfwSwapInterval(1);
 
         // Make the window visible
         glfwShowWindow(window);
