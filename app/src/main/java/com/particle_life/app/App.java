@@ -11,7 +11,6 @@ import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
 
 import java.io.IOException;
-import java.util.Random;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
@@ -49,10 +48,21 @@ public class App {
 
     // data
     private int particleNums = 100;
-    private float particleSize = 0.045f;
+    private float particleSize = 0.015f;
     private Particle[] particles = new Particle[particleNums];
     private double[] positions = new double[particleNums * 3];
-    private static final Random random = new Random();
+    private double friction = 0.85;
+    /**
+     * Time that is assumed to have passed between each simulation step, in seconds.
+     */
+    private double dt = 0.02;
+    private double rmax = 0.2;
+    private double force = 1.0;
+    private Matrix matrix;
+    private PositionSetter positionSetter = new DefaultPositionSetter();
+    private TypeSetter typeSetter = new DefaultTypeSetter();
+    private MatrixGenerator matrixGenerator = new DefaultMatrixGenerator();
+    private Accelerator accelerator;
 
     // helper class
     private final Matrix4d transform = new Matrix4d();
@@ -82,6 +92,7 @@ public class App {
             // use this to wait for events instead of polling, saving CPU
             glfwPollEvents();
 
+            update();
             draw();
 
             glfwSwapBuffers(window); // swap the color buffers
@@ -192,23 +203,77 @@ public class App {
             return;
         }
 
-        PositionSetter positionSetter = (position) -> {
-            float scale = 0.3f;
-            position.x = random.nextGaussian() * scale;
-            position.y = random.nextGaussian() * scale;
-            position.x = position.x * 0.5 + 0.5;
-            position.y = position.y * 0.5 + 0.5;
+        matrix = matrixGenerator.makeMatrix(6);
+
+        accelerator = (a, pos) -> {
+            double beta = 0.3;
+            double dist = pos.length();
+            double force = dist < beta ? (dist / beta - 1) : a * (1 - Math.abs(1 + beta - 2 * dist) / (1 - beta));
+            return pos.mul(force / dist);
         };
 
         for (int i = 0; i < particleNums; i++) {
             particles[i] = new Particle();
-            Vector3d position = particles[i].position;
-            positionSetter.set(position);
+            Particle p = particles[i];
+            positionSetter.set(p.position, p.type, matrix.size());
+
+            typeSetter.getType(new Vector3d(p.position), new Vector3d(p.velocity), p.type, matrix.size());
+
             final int i3 = 3 * i;
-            positions[i3] = position.x;
-            positions[i3 + 1] = position.y;
-            positions[i3 + 2] = position.z;
+
+            positions[i3] = p.position.x;
+            positions[i3 + 1] = p.position.y;
+            positions[i3 + 2] = p.position.z;
         }
+    }
+
+    private void update() {
+        for (int i = 0; i < particleNums; i++) {
+            updateVelocity(i);
+            updatePosition(i);
+        }
+    }
+
+    private void updateVelocity(int i) {
+        Particle p = particles[i];
+
+        // apply friction before adding new velocity
+        double frictionFactor = Math.pow(friction, 60 * dt);
+        p.velocity.mul(frictionFactor);
+
+        for (int j = 0; j < particleNums; j++) {
+            if (j == i) continue;
+            Particle q = particles[j];
+
+            Vector3d relativePosition = connection(p.position, q.position);
+
+            double distanceSquared = relativePosition.lengthSquared();
+            if (distanceSquared != 0 && distanceSquared <= rmax * rmax) {
+
+                relativePosition.div(rmax);
+                Vector3d deltaV = accelerator.accelerate(matrix.get(p.type, q.type), relativePosition);
+                // apply force as acceleration
+                p.velocity.add(deltaV.mul(rmax * force * dt));
+            }
+        }
+    }
+
+    private void updatePosition(int i) {
+        Particle p = particles[i];
+
+        // pos += vel * dt;
+        p.velocity.mulAdd(dt, p.position, p.position);
+
+        final int i3 = 3 * i;
+
+        positions[i3] = p.position.x;
+        positions[i3 + 1] = p.position.y;
+        positions[i3 + 2] = p.position.z;
+    }
+
+    private Vector3d connection(Vector3d pos1, Vector3d pos2) {
+        Vector3d delta = new Vector3d(pos2).sub(pos1);
+        return delta;
     }
 
     private boolean isFullscreen() {
