@@ -13,12 +13,23 @@ public class Physics {
 
     public Particle[] particles;
 
+    // buffers for sorting by containers
+    private int[] containers;
+    private int[][] containerNeighborhood;
+    private Particle[] particlesBuffer;
+
+    // container layout:
+    private int nx;
+    private int ny;
+    private double containerSize = 0.065;// todo: implement makeContainerNeighborhood() to make this independent of rmax
+
     private Accelerator accelerator;
     private MatrixGenerator matrixGenerator;
     private PositionSetter positionSetter;
     /**
      * This is the TypeSetter that is used by default whenever
      * an individual particle needs to be assigned a new type.
+     * 
      * @see TypeSetter#getType
      */
     private TypeSetter typeSetter;
@@ -26,11 +37,13 @@ public class Physics {
     // INITIALIZATION:
 
     /**
-     * Shorthand constructor for {@link #Physics(Accelerator, PositionSetter, MatrixGenerator, TypeSetter)} using
+     * Shorthand constructor for
+     * {@link #Physics(Accelerator, PositionSetter, MatrixGenerator, TypeSetter)}
+     * using
      * <ul>
-     *     <li>{@link DefaultPositionSetter}</li>
-     *     <li>{@link DefaultMatrixGenerator}</li>
-     *     <li>{@link DefaultTypeSetter}</li>
+     * <li>{@link DefaultPositionSetter}</li>
+     * <li>{@link DefaultMatrixGenerator}</li>
+     * <li>{@link DefaultTypeSetter}</li>
      * </ul>
      */
     public Physics(Accelerator accelerator) {
@@ -43,17 +56,45 @@ public class Physics {
      * @param matrixGenerator
      */
     public Physics(Accelerator accelerator,
-                   PositionSetter positionSetter,
-                   MatrixGenerator matrixGenerator,
-                   TypeSetter typeSetter) {
+            PositionSetter positionSetter,
+            MatrixGenerator matrixGenerator,
+            TypeSetter typeSetter) {
 
         this.accelerator = accelerator;
         this.positionSetter = positionSetter;
         this.matrixGenerator = matrixGenerator;
         this.typeSetter = typeSetter;
 
+        calcNxNy();
+        makeContainerNeighborhood();
+
         generateMatrix();
-        setParticleCount(1000);  // uses current position setter to create particles
+        setParticleCount(1000); // uses current position setter to create particles
+    }
+
+    private void calcNxNy() {
+        nx = (int) Math.floor(1 / containerSize);
+        ny = (int) Math.floor(1 / containerSize);
+    }
+
+    private void makeContainerNeighborhood() {
+        containerNeighborhood = new int[][] {
+                new int[] { -1, -1 },
+                new int[] { 0, -1 },
+                new int[] { 1, -1 },
+                new int[] { -1, 0 },
+                new int[] { 0, 0 },
+                new int[] { 1, 0 },
+                new int[] { -1, 1 },
+                new int[] { 0, 1 },
+                new int[] { 1, 1 }
+        };
+
+        // todo:
+        // top left corner
+        // top right corner
+        // bottom left corner
+        // bottom right corner
     }
 
     /**
@@ -66,6 +107,8 @@ public class Physics {
     }
 
     private void updateParticles() {
+        makeContainers();
+
         for (int i = 0; i < particles.length; i++) {
             updateVelocity(i);
             updatePosition(i);
@@ -80,11 +123,15 @@ public class Physics {
     }
 
     /**
-     * Set the size of the particle array.<br><br>
+     * Set the size of the particle array.<br>
+     * <br>
      * If the particle array is null, a new array will be created.
-     * If n is greater than the current particle array size, new particles will be created.
-     * If n is smaller than the current particle array size, random particles will be removed.
-     * In that case, the order of the particles in the array will be random afterwards.<br>
+     * If n is greater than the current particle array size, new particles will be
+     * created.
+     * If n is smaller than the current particle array size, random particles will
+     * be removed.
+     * In that case, the order of the particles in the array will be random
+     * afterwards.<br>
      * New particles will be created using the active position setter.
      * 
      * @param n The new number of particles. Must be 0 or greater.
@@ -100,7 +147,7 @@ public class Physics {
 
             Particle[] newParticles = new Particle[n];
 
-            if (n < particles.length) {  // array becomes shorter
+            if (n < particles.length) { // array becomes shorter
                 // randomly shuffle particles first
                 // (otherwise, the container layout becomes visible)
                 shuffleParticles();
@@ -109,7 +156,7 @@ public class Physics {
                 for (int i = 0; i < n; i++) {
                     newParticles[i] = particles[i];
                 }
-            } else {  // array becomes longer
+            } else { // array becomes longer
                 // copy old array and add particles to the end
                 for (int i = 0; i < particles.length; i++) {
                     newParticles[i] = particles[i];
@@ -124,7 +171,8 @@ public class Physics {
 
     /**
      * Use this to avoid the container pattern showing
-     * (i.e. if particles are treated differently depending on their position in the array).
+     * (i.e. if particles are treated differently depending on their position in the
+     * array).
      */
     private void shuffleParticles() {
         Collections.shuffle(Arrays.asList(particles));
@@ -133,8 +181,8 @@ public class Physics {
     /**
      * Creates a new particle and
      * <ol>
-     *     <li>sets its type using the default type setter</li>
-     *     <li>sets its position using the active position setter</li>
+     * <li>sets its type using the default type setter</li>
+     * <li>sets its position using the active position setter</li>
      * </ol>
      * (in that order) and returns it.
      */
@@ -153,10 +201,97 @@ public class Physics {
         p.velocity.z = 0;
     }
 
+    private void makeContainers() {
+        // ensure that nx and ny are still OK
+        containerSize = settings.rmax; // todo: in the future, containerSize should be independent of rmax
+        calcNxNy(); // todo: only change if containerSize (or range) changed
+        // todo: (future) containerNeighborhood depends on rmax and containerSize.
+        // if (rmax changed or containerSize changed) {
+        //     makeContainerNeighborhood();
+        // }
+
+        // init arrays
+        if (containers == null || containers.length != nx * ny) {
+            containers = new int[nx * ny];
+        }
+        Arrays.fill(containers, 0);
+        if (particlesBuffer == null || particlesBuffer.length != particles.length) {
+            particlesBuffer = new Particle[particles.length];
+        }
+
+        // calculate container capacity
+        for (Particle p : particles) {
+            int ci = getContainerIndex(p.position);
+            containers[ci]++;
+        }
+
+        // capacity -> index
+        int offset = 0;
+        for (int i = 0; i < containers.length; i++) {
+            int cap = containers[i];
+            containers[i] = offset;
+            offset += cap;
+        }
+
+        // fill particles into containers
+        for (Particle p : particles) {
+            int ci = getContainerIndex(p.position);
+            int i = containers[ci];
+            particlesBuffer[i] = p;
+            containers[ci]++; // for next access
+        }
+
+        // swap buffers
+        Particle[] h = particles;
+        particles = particlesBuffer;
+        particlesBuffer = h;
+    }
+
+    /**
+     * Will fail if position is outside range!
+     *
+     * @param position must be in position range
+     * @return index of the container containing <code>position</code>
+     */
+    private int getContainerIndex(Vector3d position) {
+        int cx = (int) (position.x / containerSize);
+        int cy = (int) (position.y / containerSize);
+
+        // for solid borders
+        if (cx == nx) {
+            cx = nx - 1;
+        }
+        if (cy == ny) {
+            cy = ny - 1;
+        }
+
+        return cx + cy * nx;
+    }
+
+    private int wrapContainerX(int cx) {
+        if (cx < 0) {
+            return cx + nx;
+        } else if (cx >= nx) {
+            return cx - nx;
+        } else {
+            return cx;
+        }
+    }
+
+    private int wrapContainerY(int cy) {
+        if (cy < 0) {
+            return cy + ny;
+        } else if (cy >= ny) {
+            return cy - ny;
+        } else {
+            return cy;
+        }
+    }
+
     protected final void setType(Particle p) {
         p.type = typeSetter.getType(new Vector3d(p.position), new Vector3d(p.velocity), p.type, settings.matrix.size());
     }
-    
+
     private void updateVelocity(int i) {
         Particle p = particles[i];
 
@@ -164,19 +299,41 @@ public class Physics {
         double frictionFactor = Math.pow(settings.friction, 60 * settings.dt);
         p.velocity.mul(frictionFactor);
 
-        for (int j = 0; j < particles.length; j++) {
-            if (j == i) continue;
-            Particle q = particles[j];
+        int cx0 = (int) Math.floor(p.position.x / containerSize);
+        int cy0 = (int) Math.floor(p.position.y / containerSize);
 
-            Vector3d relativePosition = connection(p.position, q.position);
+        for (int[] containerNeighbor : containerNeighborhood) {
+            int cx = cx0 + containerNeighbor[0];
+            int cy = cy0 + containerNeighbor[1];
+            if (settings.wrap) {
+                cx = wrapContainerX(cx);
+                cy = wrapContainerY(cy);
+            } else {
+                if (cx < 0 || cx >= nx || cy < 0 || cy >= ny) {
+                    continue;
+                }
+            }
+            int ci = cx + cy * nx;
 
-            double distanceSquared = relativePosition.lengthSquared();
-            if (distanceSquared != 0 && distanceSquared <= settings.rmax * settings.rmax) {
+            int start = ci == 0 ? 0 : containers[ci - 1];
+            int stop = containers[ci];
 
-                relativePosition.div(settings.rmax);
-                Vector3d deltaV = accelerator.accelerate(settings.matrix.get(p.type, q.type), relativePosition);
-                // apply force as acceleration
-                p.velocity.add(deltaV.mul(settings.rmax * settings.force * settings.dt));
+            for (int j = start; j < stop; j++) {
+                if (i == j) continue;
+
+                Particle q = particles[j];
+
+                Vector3d relativePosition = connection(p.position, q.position);
+
+                double distanceSquared = relativePosition.lengthSquared();
+                // only check particles that are closer than or at rmax
+                if (distanceSquared != 0 && distanceSquared <= settings.rmax * settings.rmax) {
+
+                    relativePosition.div(settings.rmax);
+                    Vector3d deltaV = accelerator.accelerate(settings.matrix.get(p.type, q.type), relativePosition);
+                    // apply force as acceleration
+                    p.velocity.add(deltaV.mul(settings.rmax * settings.force * settings.dt));
+                }
             }
         }
     }
@@ -194,6 +351,7 @@ public class Physics {
      * Calculates the shortest connection between two positions.
      * If <code>settings.wrap == true</code>, the connection might
      * go across the world's borders.
+     * 
      * @param pos1 first position, with coordinates in the range [0, 1].
      * @param pos2 second position, with coordinates in the range [0, 1].
      * @return the shortest connection between the two positions
@@ -208,21 +366,26 @@ public class Physics {
     }
 
     /**
-     * Changes the coordinates of the given vector to ensures that they are in the correct range.
+     * Changes the coordinates of the given vector to ensures that they are in the
+     * correct range.
      * <ul>
-     *     <li>
-     *         If <code>settings.wrap == false</code>,
-     *         the coordinates are simply clamped to [0.0, 1.0].
-     *     </li>
-     *     <li>
-     *         If <code>settings.wrap == true</code>,
-     *         the coordinates are made to be inside [0.0, 1.0) by adding or subtracting multiples of 1.
-     *     </li>
+     * <li>
+     * If <code>settings.wrap == false</code>,
+     * the coordinates are simply clamped to [0.0, 1.0].
+     * </li>
+     * <li>
+     * If <code>settings.wrap == true</code>,
+     * the coordinates are made to be inside [0.0, 1.0) by adding or subtracting
+     * multiples of 1.
+     * </li>
      * </ul>
-     * This method is called by {@link #update()} after changing the particles' positions.
+     * This method is called by {@link #update()} after changing the particles'
+     * positions.
      * It is just exposed for convenience.
      * That is, if you change the coordinates of the particles yourself,
-     * you can use this to make sure that the coordinates are in the correct range before {@link #update()} is called.
+     * you can use this to make sure that the coordinates are in the correct range
+     * before {@link #update()} is called.
+     * 
      * @param position
      */
     public void ensurePosition(Vector3d position) {
