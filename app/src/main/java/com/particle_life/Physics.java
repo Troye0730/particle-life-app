@@ -4,6 +4,7 @@ import org.joml.Vector3d;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Physics {
 
@@ -33,6 +34,14 @@ public class Physics {
      * @see TypeSetter#getType
      */
     private TypeSetter typeSetter;
+
+    public int preferredNumberOfThreads = 12;
+    private final LoadDistributor loadDistributor = new LoadDistributor();
+
+    /**
+     * This is used to stop the updating mid-particle.
+     */
+    private final AtomicBoolean updateThreadsShouldRun = new AtomicBoolean(false);
 
     // INITIALIZATION:
 
@@ -107,12 +116,30 @@ public class Physics {
     }
 
     private void updateParticles() {
+
+        updateThreadsShouldRun.set(true);
+
         makeContainers();
 
-        for (int i = 0; i < particles.length; i++) {
+        loadDistributor.distributeLoadEvenly(particles.length, preferredNumberOfThreads, i -> {
+            if (!updateThreadsShouldRun.get()) return false;
             updateVelocity(i);
+            return true;
+        });
+        loadDistributor.distributeLoadEvenly(particles.length, preferredNumberOfThreads, i -> {
+            if (!updateThreadsShouldRun.get()) return false;
             updatePosition(i);
-        }
+            return true;
+        });
+
+        updateThreadsShouldRun.set(false);
+    }
+
+    /**
+     * Interrupts all ongoing computations immediately.
+     */
+    public void kill() {
+        loadDistributor.kill();
     }
 
     public void generateMatrix() {

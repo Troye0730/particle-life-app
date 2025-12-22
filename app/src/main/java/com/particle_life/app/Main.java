@@ -112,6 +112,7 @@ public class Main extends App {
     protected void beforeClose() {
         if (!loop.stop(1000)) {
             loop.kill();
+            physics.kill();
         }
     }
 
