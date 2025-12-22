@@ -50,6 +50,8 @@ public abstract class App {
 
         // Terminate GLFW when done
         glfwTerminate();
+
+        beforeClose();
     }
 
     private void init(String title, boolean fullscreen,
@@ -163,9 +165,9 @@ public abstract class App {
         }
     }
 
-    protected void setup() {
-    }
+    protected void setup() {}
 
-    protected void draw() {
-    }
+    protected void draw() {}
+
+    protected void beforeClose() {}
 }

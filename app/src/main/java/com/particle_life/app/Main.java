@@ -1,13 +1,9 @@
 package com.particle_life.app;
 
-import com.particle_life.app.color.Color;
-import com.particle_life.app.color.Palette;
-import com.particle_life.app.color.PalettesProvider;
-import com.particle_life.Accelerator;
-import com.particle_life.Physics;
+import com.particle_life.*;
+import com.particle_life.app.color.*;
 import com.particle_life.app.shaders.ParticleShader;
-import com.particle_life.app.utils.CamOperations;
-import com.particle_life.app.utils.NormalizedDeviceCoordinates;
+import com.particle_life.app.utils.*;
 import org.joml.Matrix4d;
 import org.joml.Vector2d;
 import org.lwjgl.Version;
@@ -15,7 +11,7 @@ import org.lwjgl.Version;
 import java.io.IOException;
 
 import static org.lwjgl.opengl.GL11C.*;
-import static org.lwjgl.opengl.GL20C.GL_SHADING_LANGUAGE_VERSION;
+import static org.lwjgl.opengl.GL30C.*;
 
 public class Main extends App {
 
@@ -42,6 +38,7 @@ public class Main extends App {
     private ParticleShader particleShader;
 
     private Physics physics;
+    private Loop loop;
     /**
      * The snapshot is used to store a deep copy of the physics state
      * (particles, physics settings, ...) just for this thread,
@@ -82,6 +79,8 @@ public class Main extends App {
         }
 
         createPhysics();
+        loop = new Loop();
+        loop.start(this::updatePhysics);
 
         PalettesProvider palettes = new PalettesProvider();
         try {
@@ -104,6 +103,18 @@ public class Main extends App {
         physicsSnapshot.take(physics);
     }
 
+    private void updatePhysics(double realDt) {
+        physics.settings.dt = appSettings.autoDt ? realDt : appSettings.dt;
+        physics.update();
+    }
+
+    @Override
+    protected void beforeClose() {
+        if (!loop.stop(1000)) {
+            loop.kill();
+        }
+    }
+
     private Color[] getColorsFromPalette(int n, Palette palette) {
         Color[] colors = new Color[n];
         for (int i = 0; i < n; i++) {
@@ -115,8 +126,9 @@ public class Main extends App {
     @Override
     protected void draw() {
         // update particles
-        physicsSnapshot.take(physics);
-        physics.update();
+        loop.doOnce(() -> {
+            physicsSnapshot.take(physics);
+        });
 
         // clear the framebuffer
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);

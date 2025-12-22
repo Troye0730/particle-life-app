@@ -6,4 +6,6 @@ public class AppSettings {
 
     public float particleSize = 0.015f;   // particle size (relative to rmax)
     public Palette palette;
+    public double dt = 0.02;
+    public boolean autoDt = false;
 }
