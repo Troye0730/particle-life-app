@@ -78,7 +78,7 @@ public class Physics {
         makeContainerNeighborhood();
 
         generateMatrix();
-        setParticleCount(1000); // uses current position setter to create particles
+        setParticleCount(10000); // uses current position setter to create particles
     }
 
     private void calcNxNy() {

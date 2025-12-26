@@ -334,7 +334,7 @@ public class Main extends App {
             particleShader.setCamTopLeft((float) camBox.left, (float) camBox.top);
         }
 
-        particleShader.setSize(appSettings.particleSize);
+        particleShader.setSize(appSettings.particleSize * 2 * (float) settings.rmax);
 
         particleRenderer.drawParticles();
     }
