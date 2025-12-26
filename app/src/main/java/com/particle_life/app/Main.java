@@ -224,6 +224,8 @@ public class Main extends App {
                 if (ImGui.button(loop.pause ? "Play" : "Pause")) {
                     loop.pause ^= true;
                 }
+                ImGuiUtils.helpMarker("[SPACE] " +
+                        "The physics simulation runs independently from the graphics in the background.");
                 
                 ImGui.sameLine();
                 if (loop.getAvgFramerate() < 100000) {
