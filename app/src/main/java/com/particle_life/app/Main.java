@@ -212,6 +212,27 @@ public class Main extends App {
                 ImGui.popItemWidth();
             }
             ImGui.end();
+
+            // PHYSICS
+            ImGui.setNextWindowSize(-1, -1, ImGuiCond.FirstUseEver);
+            ImGui.setNextWindowPos(width, height, ImGuiCond.Always, 1.0f, 1.0f);
+            ImGui.getStyle().setWindowMenuButtonPosition(ImGuiDir.Right);
+            if (ImGui.begin("Physics",
+                    ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoNavFocus | ImGuiWindowFlags.NoMove)) {
+                ImGui.pushItemWidth(200);
+
+                if (ImGui.button(loop.pause ? "Play" : "Pause")) {
+                    loop.pause ^= true;
+                }
+                
+                ImGui.sameLine();
+                if (loop.getAvgFramerate() < 100000) {
+                    ImGui.text(String.format("FPS: %5.0f", loop.getAvgFramerate()));
+                } else {
+                    ImGui.text("");
+                }
+            }
+            ImGui.end();
         }
     }
 
