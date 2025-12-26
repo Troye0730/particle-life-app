@@ -163,7 +163,7 @@ public class Physics {
      * 
      * @param n The new number of particles. Must be 0 or greater.
      */
-    private void setParticleCount(int n) {
+    public void setParticleCount(int n) {
         if (particles == null) {
             particles = new Particle[n];
             for (int i = 0; i < n; i++) {

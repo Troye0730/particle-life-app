@@ -8,6 +8,7 @@ import imgui.ImGui;
 import imgui.flag.*;
 import imgui.gl3.ImGuiImplGl3;
 import imgui.type.ImBoolean;
+import imgui.type.ImInt;
 
 import org.joml.Matrix4d;
 import org.joml.Vector2d;
@@ -16,6 +17,7 @@ import org.lwjgl.Version;
 import java.io.IOException;
 
 import static org.lwjgl.opengl.GL11C.*;
+import static org.lwjgl.opengl.GL20C.GL_SHADING_LANGUAGE_VERSION;
 import static org.lwjgl.opengl.GL30C.*;
 
 public class Main extends App {
@@ -29,10 +31,9 @@ public class Main extends App {
     public static void main(String[] args) {
         Main main = new Main();
         main.launch("Particle Life Simulator",
-            false,
-            // request OpenGL version 4.1 (corresponds to "#version 410" in shaders)
-            4, 1
-        );
+                false,
+                // request OpenGL version 4.1 (corresponds to "#version 410" in shaders)
+                4, 1);
     }
 
     private final AppSettings appSettings = new AppSettings();
@@ -56,6 +57,11 @@ public class Main extends App {
      * access the data while it is being modified by the physics simulation.
      */
     private PhysicsSnapshot physicsSnapshot;
+
+    // local copy of snapshot:
+    private PhysicsSettings settings;
+    private int particleCount;
+    private int preferredNumberOfThreads;
 
     // particle rendering: controls
     private final Vector2d camPos = new Vector2d(0.5, 0.5); // world center
@@ -83,7 +89,8 @@ public class Main extends App {
         System.out.println("GLSL Version: " + GLSL_VERSION);
 
         // Method initializes LWJGL3 renderer.
-        // This method SHOULD be called after you've initialized your ImGui configuration (fonts and so on).
+        // This method SHOULD be called after you've initialized your ImGui
+        // configuration (fonts and so on).
         // ImGui context should be created as well.
         imGuiGl3.init("#version 410 core");
 
@@ -91,8 +98,8 @@ public class Main extends App {
 
         try {
             particleShader = new ParticleShader("src/main/resources/shaders/default.vert",
-                                    "src/main/resources/shaders/default.geom",
-                                    "src/main/resources/shaders/default.frag");
+                    "src/main/resources/shaders/default.geom",
+                    "src/main/resources/shaders/default.frag");
         } catch (IOException e) {
             e.printStackTrace();
             return;
@@ -159,7 +166,8 @@ public class Main extends App {
 
         imGuiGl3.newFrame();
         // render GUI
-        // Note: Any Dear ImGui code must go between ImGui.newFrame() and ImGui.render().
+        // Note: Any Dear ImGui code must go between ImGui.newFrame() and
+        // ImGui.render().
         ImGui.newFrame();
         buildGui();
         ImGui.render();
@@ -176,13 +184,32 @@ public class Main extends App {
             ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding, 4f, 0f);
             ImGui.pushStyleVar(ImGuiStyleVar.WindowMinSize, 0f, 0f);
             if (ImGui.begin("Particle Life Simulator",
-                ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoNavFocus
-                    | ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.MenuBar)) {
+                    ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoNavFocus | ImGuiWindowFlags.NoMove
+                            | ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.MenuBar)) {
                 ImGui.popStyleVar(3);
                 if (ImGui.beginMenuBar()) {
                     buildMainMenu();
                     ImGui.endMenuBar();
                 }
+            }
+            ImGui.end();
+
+            // PARTICLES
+            ImGui.setNextWindowSize(-1, -1, ImGuiCond.FirstUseEver);
+            ImGui.setNextWindowPos(width, 0, ImGuiCond.Always, 1.0f, 0.0f);
+            ImGui.getStyle().setWindowMenuButtonPosition(ImGuiDir.Right);
+            if (ImGui.begin("Particles",
+                    ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoNavFocus | ImGuiWindowFlags.NoMove)) {
+                ImGui.pushItemWidth(200);
+
+                // N
+                ImInt particleCountInput = new ImInt(particleCount);
+                if (ImGui.inputInt("Particle count", particleCountInput, 1000, 1000, ImGuiInputTextFlags.EnterReturnsTrue)) {
+                    final int newCount = Math.max(0, particleCountInput.get());
+                    loop.enqueue(() -> physics.setParticleCount(newCount));
+                }
+
+                ImGui.popItemWidth();
             }
             ImGui.end();
         }
@@ -227,8 +254,10 @@ public class Main extends App {
             }
 
             if (ImGui.beginMenu("Zoom")) {
-                if (ImGui.menuItem("100%", "z")) {}
-                if (ImGui.menuItem("Fit", "Z")) {}
+                if (ImGui.menuItem("100%", "z")) {
+                }
+                if (ImGui.menuItem("Fit", "Z")) {
+                }
                 ImGui.endMenu();
             }
 
@@ -241,7 +270,12 @@ public class Main extends App {
     }
 
     private void render() {
-        particleRenderer.bufferParticleData(particleShader, physicsSnapshot.positions, physicsSnapshot.types);
+        particleRenderer.bufferParticleData(particleShader,
+            physicsSnapshot.positions,
+            physicsSnapshot.types);
+        settings = physicsSnapshot.settings.deepCopy();
+        particleCount = physicsSnapshot.particleCount;
+        preferredNumberOfThreads = physics.preferredNumberOfThreads;
 
         int texWidth, texHeight;
 
@@ -250,24 +284,25 @@ public class Main extends App {
             texWidth = desiredTexSize;
             texHeight = desiredTexSize;
             new NormalizedDeviceCoordinates(
-                    new Vector2d(0.5, 0.5),  // center camera
-                    new Vector2d(1, 1)  // capture whole screen
+                    new Vector2d(0.5, 0.5), // center camera
+                    new Vector2d(1, 1) // capture whole screen
             ).getMatrix(transform);
         } else {
             texWidth = width;
             texHeight = height;
             Vector2d texCamSize = new Vector2d(camSize);
-            if (width > height) texCamSize.x *= (double) texWidth / texHeight;
-            else if (height > width) texCamSize.y *= (double) texHeight / texWidth;
+            if (width > height)
+                texCamSize.x *= (double) texWidth / texHeight;
+            else if (height > width)
+                texCamSize.y *= (double) texHeight / texWidth;
             new NormalizedDeviceCoordinates(
                     new Vector2d(texCamSize.x / 2, texCamSize.y / 2),
-                    texCamSize
-            ).getMatrix(transform);
+                    texCamSize).getMatrix(transform);
         }
 
         particleShader.use();
 
-        particleShader.setPalette(getColorsFromPalette(physicsSnapshot.settings.matrix.size(), appSettings.palette));
+        particleShader.setPalette(getColorsFromPalette(settings.matrix.size(), appSettings.palette));
         particleShader.setTransform(transform);
 
         CamOperations cam = new CamOperations(camPos, camSize, width, height);
