@@ -209,6 +209,14 @@ public class Main extends App {
                     loop.enqueue(() -> physics.setParticleCount(newCount));
                 }
 
+                // MATRIX
+                ImGuiMatrix.draw(200 * scale, 200 * scale,
+                        appSettings.palette,
+                        appSettings.matrixGuiStepSize,
+                        settings.matrix,
+                        (i, j, newValue) -> loop.enqueue(() -> physics.settings.matrix.set(i, j, newValue))
+                );
+
                 ImGui.popItemWidth();
             }
             ImGui.end();

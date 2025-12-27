@@ -15,6 +15,9 @@ public abstract class App {
     protected int width;
     protected int height;
 
+    // global scaling of GUI -> apply this to window sizes etc.
+    protected float scale = 1.0f;
+
     // remember window position and size before switching to fullscreen
     private int windowPosX;
     private int windowPosY;
