@@ -12,11 +12,13 @@ class PhysicsSnapshot {
 
     PhysicsSettings settings;
     int particleCount;
+    int[] typeCount;
 
-    void take(Physics p) {
+    void take(ExtendedPhysics p) {
         write(p.particles);
         settings = p.settings.deepCopy();
         particleCount = p.particles.length;
+        typeCount = p.getTypeCount();
     }
 
     private void write(Particle[] particles) {

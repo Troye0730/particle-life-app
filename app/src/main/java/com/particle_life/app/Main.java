@@ -16,6 +16,7 @@ import org.joml.Vector2d;
 import org.lwjgl.Version;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL20C.GL_SHADING_LANGUAGE_VERSION;
@@ -47,7 +48,7 @@ public class Main extends App {
     private final ParticleRenderer particleRenderer = new ParticleRenderer();
     private final ImGuiImplGl3 imGuiGl3 = new ImGuiImplGl3();
 
-    private Physics physics;
+    private ExtendedPhysics physics;
     private Loop loop;
     /**
      * The snapshot is used to store a deep copy of the physics state
@@ -67,6 +68,10 @@ public class Main extends App {
     // particle rendering: controls
     private final Vector2d camPos = new Vector2d(0.5, 0.5); // world center
     private double camSize = 1.0;
+
+    // GUI: constants that control how the GUI behaves
+    private int typeCountDiagramStepSize = 100;
+    private boolean typeCountDisplayPercentage = false;
 
     // GUI: hide / show parts
     private final ImBoolean showGui = new ImBoolean(true);
@@ -126,7 +131,7 @@ public class Main extends App {
             double force = dist < beta ? (dist / beta - 1) : a * (1 - Math.abs(1 + beta - 2 * dist) / (1 - beta));
             return pos.mul(force / dist);
         };
-        physics = new Physics(accelerator);
+        physics = new ExtendedPhysics(accelerator);
         physicsSnapshot = new PhysicsSnapshot();
         physicsSnapshot.take(physics);
     }
@@ -235,6 +240,47 @@ public class Main extends App {
                     ImFloat inputValue = new ImFloat((float) appSettings.matrixGuiStepSize);
                     if (ImGui.inputFloat("Step Size##Matrix", inputValue, 0.05f, 0.05f, "%.2f")) {
                         appSettings.matrixGuiStepSize = MathUtils.clamp(inputValue.get(), 0.05f, 1.0f);
+                    }
+                    ImGui.treePop();
+                }
+
+                ImGuiUtils.separator();
+
+                // NTYPES
+                ImInt matrixSizeInput = new ImInt(settings.matrix.size());
+                if (ImGui.inputInt("Colors##input", matrixSizeInput, 1, 1, ImGuiInputTextFlags.EnterReturnsTrue)) {
+                    final int newSize = Math.max(1, Math.min(matrixSizeInput.get(), 256));
+                    loop.enqueue(() -> physics.setMatrixSize(newSize));
+                }
+
+                ImGuiBarGraph.draw(200, 100,
+                        appSettings.palette,
+                        typeCountDiagramStepSize,
+                        physicsSnapshot.typeCount,
+                        (type, newValue) -> {
+                            final int[] newTypeCount = Arrays.copyOf(physicsSnapshot.typeCount, physicsSnapshot.typeCount.length);
+                            newTypeCount[type] = newValue;
+                            loop.enqueue(() -> physics.setTypeCount(newTypeCount));
+                        },
+                        typeCountDisplayPercentage
+                );
+                if (ImGui.button("Equalize")) {
+                    loop.enqueue(() -> physics.setTypeCountEqual());
+                }
+                if (ImGui.treeNode("Settings##colorbars")) {
+                    {
+                        ImInt inputValue = new ImInt(typeCountDiagramStepSize);
+                        if (ImGui.inputInt("Step Size##ColorCount", inputValue, 10)) {
+                            typeCountDiagramStepSize = Math.max(0, inputValue.get());
+                        }
+                    }
+
+                    {
+                        ImInt selected = new ImInt(typeCountDisplayPercentage ? 1 : 0);
+                        ImGui.radioButton("Absolute", selected, 0);
+                        ImGui.sameLine();
+                        ImGui.radioButton("Percentage", selected, 1);
+                        typeCountDisplayPercentage = selected.get() == 1;
                     }
                     ImGui.treePop();
                 }
