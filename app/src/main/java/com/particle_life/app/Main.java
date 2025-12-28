@@ -65,6 +65,7 @@ public class Main extends App {
      * access the data while it is being modified by the physics simulation.
      */
     private PhysicsSnapshot physicsSnapshot;
+    private LoadDistributor physicsSnapshotLoadDistributor;  // speed up taking snapshots with parallelization
 
     // local copy of snapshot:
     private PhysicsSettings settings;
@@ -151,7 +152,8 @@ public class Main extends App {
                 matrixGenerators.getActive(),
                 typeSetters.getActive());
         physicsSnapshot = new PhysicsSnapshot();
-        physicsSnapshot.take(physics);
+        physicsSnapshotLoadDistributor = new LoadDistributor();
+        physicsSnapshot.take(physics, physicsSnapshotLoadDistributor);
     }
 
     private void updatePhysics(double realDt) {
@@ -164,6 +166,7 @@ public class Main extends App {
         if (!loop.stop(1000)) {
             loop.kill();
             physics.kill();
+            physicsSnapshotLoadDistributor.kill();
         }
         imGuiGl3.shutdown();
     }
@@ -184,7 +187,7 @@ public class Main extends App {
 
         // update particles
         loop.doOnce(() -> {
-            physicsSnapshot.take(physics);
+            physicsSnapshot.take(physics, physicsSnapshotLoadDistributor);
         });
 
         render();

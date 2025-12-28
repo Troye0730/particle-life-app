@@ -1,10 +1,12 @@
 package com.particle_life.app;
 
-import com.particle_life.Physics;
+import com.particle_life.LoadDistributor;
 import com.particle_life.Particle;
 import com.particle_life.PhysicsSettings;
 
 class PhysicsSnapshot {
+
+    private static final int PREFERRED_NUMBER_OF_THREADS = 12;
 
     double[] positions;
     double[] velocities;
@@ -14,14 +16,14 @@ class PhysicsSnapshot {
     int particleCount;
     int[] typeCount;
 
-    void take(ExtendedPhysics p) {
-        write(p.particles);
+    void take(ExtendedPhysics p, LoadDistributor loadDistributor) {
+        write(p.particles, loadDistributor);
         settings = p.settings.deepCopy();
         particleCount = p.particles.length;
         typeCount = p.getTypeCount();
     }
 
-    private void write(Particle[] particles) {
+    private void write(Particle[] particles, LoadDistributor loadDistributor) {
         int n = particles.length;
 
         if (types == null || types.length != n) {
@@ -30,7 +32,7 @@ class PhysicsSnapshot {
             types = new int[n];
         }
 
-        for (int i = 0; i < n; i++) {
+        loadDistributor.distributeLoadEvenly(n, PREFERRED_NUMBER_OF_THREADS, i -> {
             Particle p = particles[i];
 
             final int i3 = 3 * i;
@@ -44,6 +46,8 @@ class PhysicsSnapshot {
             velocities[i3 + 2] = p.velocity.z;
 
             types[i] = p.type;
-        }
+
+            return true;
+        });
     }
 }
