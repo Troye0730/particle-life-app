@@ -21,6 +21,8 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.lwjgl.opengl.GL11C.*;
+import static org.lwjgl.opengl.GL13C.GL_CLAMP_TO_BORDER;
+import static org.lwjgl.opengl.GL13C.GL_MULTISAMPLE;
 import static org.lwjgl.opengl.GL20C.GL_SHADING_LANGUAGE_VERSION;
 import static org.lwjgl.opengl.GL30C.*;
 
@@ -75,6 +77,7 @@ public class Main extends App {
     private int preferredNumberOfThreads;
 
     // particle rendering: controls
+    private boolean traces = false;
     private final Vector2d camPos = new Vector2d(0.5, 0.5); // world center
     private double camSize = 1.0;
 
@@ -89,6 +92,9 @@ public class Main extends App {
     private final ImBoolean showAboutWindow = new ImBoolean(false);
     private final ImBoolean showSavesPopup = new ImBoolean(false);
 
+    // offscreen rendering buffers
+    private MultisampledFramebuffer worldTexture;  // particles
+
     @Override
     protected void setup() {
         LWJGL_VERSION = Version.getVersion();
@@ -102,6 +108,8 @@ public class Main extends App {
         System.out.println("OpenGL Renderer: " + OPENGL_RENDERER);
         System.out.println("OpenGL Version: " + OPENGL_VERSION);
         System.out.println("GLSL Version: " + GLSL_VERSION);
+
+        glEnable(GL_MULTISAMPLE);
 
         // Method initializes LWJGL3 renderer.
         // This method SHOULD be called after you've initialized your ImGui
@@ -139,6 +147,16 @@ public class Main extends App {
         if (palettes.hasName(appSettings.palette)) {
             palettes.setActive(palettes.getIndexByName(appSettings.palette));
         }
+
+        // generate offscreen frame buffer to render particles to a multisampled texture
+        // and also a simple texture for converting the multisampled texture to a single-sampled texture
+        // (this is necessary because ImGui can't handle multisampled textures in the drawlist)
+        worldTexture = new MultisampledFramebuffer();
+        worldTexture.init();
+        glBindTexture(GL_TEXTURE_2D, worldTexture.textureSingle);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
     private void createPhysics() {
@@ -179,9 +197,6 @@ public class Main extends App {
         renderClock.tick();
         updateCanvas();
 
-        glClearColor(0, 0, 0, 1);
-        glClear(GL_COLOR_BUFFER_BIT);
-
         int texWidth, texHeight;
 
         // todo: make this part look less like magic
@@ -194,17 +209,23 @@ public class Main extends App {
                     new Vector2d(1, 1) // capture whole screen
             ).getMatrix(transform);
         } else {
-            texWidth = width;
-            texHeight = height;
+            if (settings.wrap) {
+                texWidth = Math.min(desiredTexSize, width);
+                texHeight = Math.min(desiredTexSize, height);
+            } else {
+                texWidth = width;
+                texHeight = height;
+            }
             Vector2d texCamSize = new Vector2d(camSize);
-            if (width > height)
-                texCamSize.x *= (double) texWidth / texHeight;
-            else if (height > width)
-                texCamSize.y *= (double) texHeight / texWidth;
+            if (width > height) texCamSize.x *= (double) texWidth / texHeight;
+            else if (height > width) texCamSize.y *= (double) texHeight / texWidth;
             new NormalizedDeviceCoordinates(
                     new Vector2d(texCamSize.x / 2, texCamSize.y / 2),
-                    texCamSize).getMatrix(transform);
+                    texCamSize
+            ).getMatrix(transform);
         }
+
+        worldTexture.ensureSize(texWidth, texHeight, 16);
 
         ParticleShader particleShader = shaders.getActive();
         
@@ -221,19 +242,45 @@ public class Main extends App {
         } else {
             particleShader.setCamTopLeft((float) camBox.left, (float) camBox.top);
         }
-
+        particleShader.setWrap(settings.wrap);
         particleShader.setSize(appSettings.particleSize * 2 * (float) settings.rmax);
 
-        particleRenderer.drawParticles();
+        if (!traces) worldTexture.clear(0, 0, 0, 0);
 
-        imGuiGl3.newFrame();
+        glEnable(GL_BLEND);
+        particleShader.blendMode.glBlendFunc();
+
+        glDisable(GL_SCISSOR_TEST);
+        glViewport(0, 0, texWidth, texHeight);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, worldTexture.framebufferMulti);
+        particleRenderer.drawParticles();
+        worldTexture.toSingleSampled();
+
+        glBindTexture(GL_TEXTURE_2D, worldTexture.textureSingle);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, settings.wrap ? GL_REPEAT : GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, settings.wrap ? GL_REPEAT : GL_CLAMP_TO_BORDER);
+        glBindTexture(GL_TEXTURE_2D, 0);
 
         // render GUI
         // Note: Any Dear ImGui code must go between ImGui.newFrame() and ImGui.render().
+        imGuiGl3.newFrame();
         ImGui.newFrame();
+        if (camSize > 1) {
+            ImGui.getBackgroundDrawList().addImage(worldTexture.textureSingle, 0, 0, width, height,
+                    (float) camBox.left, (float) camBox.top,
+                    (float) camBox.right, (float) camBox.bottom);
+        } else {
+            ImGui.getBackgroundDrawList().addImage(worldTexture.textureSingle, 0, 0, width, height,
+                    0, 0, (float) width / texWidth, (float) height / texHeight);
+        }
+
         buildGui();
         ImGui.render();
 
+        glDisable(GL_SCISSOR_TEST);
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         imGuiGl3.renderDrawData(ImGui.getDrawData());
     }
 

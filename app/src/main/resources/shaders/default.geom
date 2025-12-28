@@ -3,6 +3,7 @@
 
 uniform mat4 transform;
 uniform vec2 camTopLeft;
+uniform bool wrap;
 uniform float size;
 
 layout (points) in;
@@ -49,4 +50,34 @@ void main() {
     center -= vec4(camTopLeft, 0.0, 0.0);
 
     quad(center);
+
+    if (wrap) {
+        // Some particles are so close to the edge of the world
+        // that they already appear on the other side.
+        // We need to draw them there as well.
+
+        float r = 0.5 * size;
+        int dx = 0;
+        int dy = 0;
+
+        if (center.x < r) {
+            dx = 1;
+        } else if (center.x > 1 - r) {
+            dx = -1;
+        }
+        if (center.y < r) {
+            dy = 1;
+        } else if (center.y > 1 - r) {
+            dy = -1;
+        }
+        if (dx != 0) {
+            quad(center + vec4(float(dx), 0.0, 0.0, 0.0));
+        }
+        if (dy != 0) {
+            quad(center + vec4(0.0, float(dy), 0.0, 0.0));
+        }
+        if ((dx != 0) && (dy != 0)) {
+            quad(center + vec4(float(dx), float(dy), 0.0, 0.0));
+        }
+    }
 }

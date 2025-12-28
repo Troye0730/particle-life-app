@@ -13,6 +13,7 @@ public class ParticleShader {
     private final int paletteUniformLocation;
     private final int transformUniformLocation;
     private final int camTopLeftUniformLocation;
+    private final int wrapUniformLocation;
     private final int sizeUniformLocation;
 
     public final int xAttribLocation;
@@ -33,6 +34,7 @@ public class ParticleShader {
         paletteUniformLocation = glGetUniformLocation(shaderProgram, "palette");
         transformUniformLocation = glGetUniformLocation(shaderProgram, "transform");
         camTopLeftUniformLocation = glGetUniformLocation(shaderProgram, "camTopLeft");
+        wrapUniformLocation = glGetUniformLocation(shaderProgram, "wrap");
         sizeUniformLocation = glGetUniformLocation(shaderProgram, "size");
 
         xAttribLocation = glGetAttribLocation(shaderProgram, "x");
@@ -70,5 +72,9 @@ public class ParticleShader {
 
     public void setCamTopLeft(float camLeft, float camTop) {
         glUniform2f(camTopLeftUniformLocation, camLeft, camTop);
+    }
+
+    public void setWrap(boolean wrap) {
+        glUniform1i(wrapUniformLocation, wrap ? 1 : 0);
     }
 }
