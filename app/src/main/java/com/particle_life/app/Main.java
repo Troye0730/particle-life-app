@@ -46,6 +46,7 @@ public class Main extends App {
     private SelectionManager<Palette> palettes;
     private SelectionManager<MatrixGenerator> matrixGenerators;
     private SelectionManager<PositionSetter> positionSetters;
+    private SelectionManager<TypeSetter> typeSetters;
 
     // helper class
     private final Matrix4d transform = new Matrix4d();
@@ -111,6 +112,7 @@ public class Main extends App {
             palettes = new SelectionManager<>(new PalettesProvider());
             matrixGenerators = new SelectionManager<>(new MatrixGeneratorProvider());
             positionSetters = new SelectionManager<>(new PositionSetterProvider());
+            typeSetters = new SelectionManager<>(new TypeSetterProvider());
 
             positionSetters.setActivesByName(appSettings.positionSetter);
         } catch (Exception e) {
@@ -142,7 +144,11 @@ public class Main extends App {
             double force = dist < beta ? (dist / beta - 1) : a * (1 - Math.abs(1 + beta - 2 * dist) / (1 - beta));
             return pos.mul(force / dist);
         };
-        physics = new ExtendedPhysics(accelerator);
+        physics = new ExtendedPhysics(
+                accelerator,
+                positionSetters.getActive(),
+                matrixGenerators.getActive(),
+                typeSetters.getActive());
         physicsSnapshot = new PhysicsSnapshot();
         physicsSnapshot.take(physics);
     }

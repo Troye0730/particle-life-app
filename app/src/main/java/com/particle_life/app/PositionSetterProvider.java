@@ -18,6 +18,9 @@ public class PositionSetterProvider implements InfoWrapperProvider<PositionSette
                 new InfoWrapper<>("centered", (position, type, nTypes) -> {
                     float scale = 0.3f;
                     position.x = random.nextGaussian() * scale;
+                    position.y = random.nextGaussian() * scale;
+                    position.x = position.x * 0.5 + 0.5;
+                    position.y = position.y * 0.5 + 0.5;
                 }),
                 new InfoWrapper<>("uniform", new DefaultPositionSetter()),
                 new InfoWrapper<>("uniform circle", (position, type, nTypes) -> {

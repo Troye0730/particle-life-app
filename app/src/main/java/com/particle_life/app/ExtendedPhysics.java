@@ -8,10 +8,6 @@ import java.util.Collections;
 
 public class ExtendedPhysics extends Physics {
 
-    ExtendedPhysics(Accelerator accelerator) {
-        super(accelerator);
-    }
-
     ExtendedPhysics(Accelerator accelerator, PositionSetter positionSetter, MatrixGenerator matrixGenerator, TypeSetter typeSetter) {
         super(accelerator, positionSetter, matrixGenerator, typeSetter);
     }
