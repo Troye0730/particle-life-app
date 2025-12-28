@@ -1,5 +1,6 @@
 package com.particle_life.app.utils;
 
+import com.particle_life.app.selection.SelectionManager;
 import imgui.ImGui;
 import imgui.flag.ImGuiSliderFlags;
 
@@ -30,6 +31,34 @@ public final class ImGuiUtils {
             ImGui.popTextWrapPos();
             ImGui.endTooltip();
         }
+    }
+
+    /**
+     * @return if the selection index changed
+     */
+    public static boolean renderCombo(String label, SelectionManager<?> selectionManager) {
+        int previousIndex = selectionManager.getActiveIndex();
+        if (ImGui.beginCombo(label, selectionManager.getActiveName())) {
+            for (int i = 0; i < selectionManager.size(); i++) {
+                boolean isSelected = selectionManager.getActiveIndex() == i;
+                if (ImGui.selectable(selectionManager.get(i).name, isSelected)) {
+                    selectionManager.setActive(i);
+                }
+                if (isSelected) {
+                    ImGui.setItemDefaultFocus();
+                }
+                if (ImGui.isItemHovered()) {
+                    String description = selectionManager.get(i).description;
+                    if (!description.isBlank()) {
+                        ImGui.beginTooltip();
+                        ImGui.textUnformatted(description);
+                        ImGui.endTooltip();
+                    }
+                }
+            }
+            ImGui.endCombo();
+        }
+        return selectionManager.getActiveIndex() != previousIndex;
     }
 
     public interface NumberInputCallback {

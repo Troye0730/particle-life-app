@@ -232,6 +232,19 @@ public class Main extends App {
                     loop.enqueue(() -> physics.setParticleCount(newCount));
                 }
 
+                // POSITION SETTERS
+                if (ImGuiUtils.renderCombo("##positions", positionSetters)) {
+                    final PositionSetter nextPositionSetter = positionSetters.getActive();
+                    loop.enqueue(() -> physics.positionSetter = nextPositionSetter);
+                }
+                ImGui.sameLine();
+                if (ImGui.button("Positions")) {
+                    loop.enqueue(physics::setPositions);
+                }
+                ImGuiUtils.helpMarker("[p]");
+
+                ImGuiUtils.separator();
+
                 // MATRIX
                 ImGuiMatrix.draw(200 * scale, 200 * scale,
                         palettes.getActive(),

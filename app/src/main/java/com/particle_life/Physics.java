@@ -26,7 +26,7 @@ public class Physics {
 
     private Accelerator accelerator;
     private MatrixGenerator matrixGenerator;
-    private PositionSetter positionSetter;
+    public PositionSetter positionSetter;
     /**
      * This is the TypeSetter that is used by default whenever
      * an individual particle needs to be assigned a new type.
@@ -140,6 +140,14 @@ public class Physics {
      */
     public void kill() {
         loadDistributor.kill();
+    }
+
+    /**
+     * Call this to initialize particles or when the particle count changed.
+     * If the particle count changed, new particles will be created using the active position setter.
+     */
+    public void setPositions() {
+        Arrays.stream(particles).forEach(this::setPosition);
     }
 
     public void generateMatrix() {

@@ -1,5 +1,6 @@
 package com.particle_life.app.selection;
 
+import java.lang.ProcessHandle.Info;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -22,12 +23,24 @@ public class SelectionManager<T> {
         return items.size();
     }
 
+    public InfoWrapper<T> get(int i) {
+        return items.get(i);
+    }
+
+    public int getActiveIndex() {
+        return activeIndex;
+    }
+
     public InfoWrapper<T> getActiveInfoWrapper() {
         return items.get(activeIndex);
     }
 
     public T getActive() {
         return getActiveInfoWrapper().object;
+    }
+
+    public String getActiveName() {
+        return getActiveInfoWrapper().name;
     }
 
     public void setActive(int i) {
