@@ -18,6 +18,7 @@ import org.joml.Vector2d;
 import org.lwjgl.Version;
 
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL20C.GL_SHADING_LANGUAGE_VERSION;
@@ -66,6 +67,7 @@ public class Main extends App {
      */
     private PhysicsSnapshot physicsSnapshot;
     private LoadDistributor physicsSnapshotLoadDistributor;  // speed up taking snapshots with parallelization
+    public AtomicBoolean newSnapshotAvailable = new AtomicBoolean(false);
 
     // local copy of snapshot:
     private PhysicsSettings settings;
@@ -154,6 +156,7 @@ public class Main extends App {
         physicsSnapshot = new PhysicsSnapshot();
         physicsSnapshotLoadDistributor = new LoadDistributor();
         physicsSnapshot.take(physics, physicsSnapshotLoadDistributor);
+        newSnapshotAvailable.set(true);
     }
 
     private void updatePhysics(double realDt) {
@@ -188,6 +191,7 @@ public class Main extends App {
         // update particles
         loop.doOnce(() -> {
             physicsSnapshot.take(physics, physicsSnapshotLoadDistributor);
+            newSnapshotAvailable.set(true);
         });
 
         render();
@@ -506,12 +510,19 @@ public class Main extends App {
 
     private void render() {
         ParticleShader particleShader = shaders.getActive();
-        particleRenderer.bufferParticleData(particleShader,
-            physicsSnapshot.positions,
-            physicsSnapshot.types);
-        settings = physicsSnapshot.settings.deepCopy();
-        particleCount = physicsSnapshot.particleCount;
-        preferredNumberOfThreads = physics.preferredNumberOfThreads;
+        if (newSnapshotAvailable.get()) {
+
+            // get local copy of snapshot
+
+            particleRenderer.bufferParticleData(particleShader,
+                    physicsSnapshot.positions,
+                    physicsSnapshot.types);
+            settings = physicsSnapshot.settings.deepCopy();
+            particleCount = physicsSnapshot.particleCount;
+            preferredNumberOfThreads = physics.preferredNumberOfThreads;
+
+            newSnapshotAvailable.set(false);
+        }
 
         int texWidth, texHeight;
 
