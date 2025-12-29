@@ -37,7 +37,7 @@ public class Main extends App {
     public static void main(String[] args) {
         Main main = new Main();
         main.launch("Particle Life Simulator",
-                false,
+                main.appSettings.startInFullscreen,
                 // request OpenGL version 4.1 (corresponds to "#version 410" in shaders)
                 4, 1);
     }
@@ -80,6 +80,23 @@ public class Main extends App {
     private boolean traces = false;
     private final Vector2d camPos = new Vector2d(0.5, 0.5); // world center
     private double camSize = 1.0;
+    boolean draggingShift = false;
+    boolean leftDraggingParticles = false;  // dragging with left mouse button
+    boolean rightDraggingParticles = false;  // dragging with right mouse button
+    boolean leftPressed = false;
+    boolean rightPressed = false;
+    boolean upPressed = false;
+    boolean downPressed = false;
+    boolean wPressed = false;
+    boolean aPressed = false;
+    boolean sPressed = false;
+    boolean dPressed = false;
+    boolean leftShiftPressed = false;
+    boolean rightShiftPressed = false;
+    boolean leftControlPressed = false;
+    boolean rightControlPressed = false;
+    boolean leftAltPressed = false;
+    boolean rightAltPressed = false;
 
     // GUI: constants that control how the GUI behaves
     private int typeCountDiagramStepSize = 100;
@@ -615,5 +632,112 @@ public class Main extends App {
             colors[i] = palette.getColor(i, n);
         }
         return colors;
+    }
+
+    @Override
+    protected void onKeyPressed(String keyName) {
+        // update key states
+        switch (keyName) {
+            case "LEFT" -> leftPressed = true;
+            case "RIGHT" -> rightPressed = true;
+            case "UP" -> upPressed = true;
+            case "DOWN" -> downPressed = true;
+            case "w" -> wPressed = true;
+            case "a" -> aPressed = true;
+            case "s" -> sPressed = true;
+            case "d" -> dPressed = true;
+            case "LEFT_SHIFT" -> leftShiftPressed = true;
+            case "RIGHT_SHIFT" -> rightShiftPressed = true;
+            case "LEFT_CONTROL" -> leftControlPressed = true;
+            case "RIGHT_CONTROL" -> rightControlPressed = true;
+            case "LEFT_ALT" -> leftAltPressed = true;
+            case "RIGHT_ALT" -> rightAltPressed = true;
+        }
+
+        // ctrl + key shortcuts
+        if (leftControlPressed | rightControlPressed) {
+            switch (keyName) {
+                case "s" -> {
+                    showSavesPopup.set(true);
+
+                    // Clear key states manually, because releasing [ctrl]+[s]
+                    // won't be captured once the popup is open.
+                    leftControlPressed = false;
+                    rightControlPressed = false;
+                    sPressed = false;
+                }
+            }
+            return;
+        }
+
+        // simple key shortcuts
+        switch (keyName) {
+            case "ESCAPE" -> showGui.set(!showGui.get());
+            case "f" -> setFullscreen(!isFullscreen());
+            case "t" -> traces ^= true;
+            case "p" -> loop.enqueue(physics::setPositions);
+            case "c" -> loop.enqueue(() -> {
+                TypeSetter previousTypeSetter = physics.typeSetter;
+                physics.typeSetter = typeSetters.getActive();
+                physics.setTypes();
+                physics.typeSetter = previousTypeSetter;
+            });
+            case "g" -> showGraphicsWindow.set(!showGraphicsWindow.get());
+            case "m" -> loop.enqueue(physics::generateMatrix);
+            case "b" -> loop.enqueue(() -> physics.settings.wrap ^= true);
+            case " " -> loop.pause ^= true;
+            case "q" -> close();
+        }
+    }
+
+    @Override
+    protected void onKeyReleased(String keyName) {
+        // update key states
+        switch (keyName) {
+            case "LEFT" -> leftPressed = false;
+            case "RIGHT" -> rightPressed = false;
+            case "UP" -> upPressed = false;
+            case "DOWN" -> downPressed = false;
+            case "w" -> wPressed = false;
+            case "a" -> aPressed = false;
+            case "s" -> sPressed = false;
+            case "d" -> dPressed = false;
+            case "LEFT_SHIFT" -> leftShiftPressed = false;
+            case "RIGHT_SHIFT" -> rightShiftPressed = false;
+            case "LEFT_CONTROL" -> leftControlPressed = false;
+            case "RIGHT_CONTROL" -> rightControlPressed = false;
+            case "LEFT_ALT" -> leftAltPressed = false;
+            case "RIGHT_ALT" -> rightAltPressed = false;
+        }
+    }
+
+    @Override
+    protected void onMousePressed(int button) {
+        if (button == 2) {  // middle mouse button
+            draggingShift = true;
+        } else if (button == 0) {  // left mouse button
+            leftDraggingParticles = true;
+        } else if (button == 1) {  // right mouse button
+            rightDraggingParticles = true;
+        }
+    }
+
+    @Override
+    protected void onMouseReleased(int button) {
+        if (button == 2) {  // middle mouse button
+            draggingShift = false;
+        } else if (button == 0) {  // left mouse button
+            leftDraggingParticles = false;
+        } else if (button == 1) {  // right mouse button
+            rightDraggingParticles = false;
+        }
+    }
+
+    @Override
+    protected void setFullscreen(boolean fullscreen) {
+        super.setFullscreen(fullscreen);
+
+        // remember fullscreen state for next startup
+        appSettings.startInFullscreen = fullscreen;
     }
 }

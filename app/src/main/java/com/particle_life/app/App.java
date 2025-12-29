@@ -38,7 +38,7 @@ public abstract class App {
 
         ImGuiLayer imGuiLayer = new ImGuiLayer(window);
         imGuiLayer.initImGui();
-        setCallbacks();
+        setCallbacks(imGuiLayer);
 
         setup();
 
@@ -125,20 +125,55 @@ public abstract class App {
         glfwShowWindow(window);
     }
 
-    private void setCallbacks() {
+    private void setCallbacks(ImGuiLayer imGuiLayer) {
         glfwSetWindowSizeCallback(window, (window1, newWidth, newHeight) -> {
             width = newWidth;
             height = newHeight;
         });
 
-        // Set a key callback. It will be called every time a key is pressed, repeated or released.
-        glfwSetKeyCallback(window, (window, key, scancode, action, mods) -> {
-            if (key == GLFW_KEY_F && action == GLFW_PRESS) {
-                setFullscreen(!isFullscreen());
+        imGuiLayer.keyCallbacks.add((window, key, scancode, action, mods) -> {
+            if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
+                this.setFullscreen(!isFullscreen());
+            } else {
+                String keyName = glfwGetKeyName(key, scancode);
+                if (keyName == null) {
+                    // try to recover special keys
+                    keyName = switch (key) {
+                        case GLFW_KEY_SPACE -> " ";
+                        case GLFW_KEY_LEFT -> "LEFT";
+                        case GLFW_KEY_RIGHT -> "RIGHT";
+                        case GLFW_KEY_UP -> "UP";
+                        case GLFW_KEY_DOWN -> "DOWN";
+                        case GLFW_KEY_LEFT_SHIFT -> "LEFT_SHIFT";
+                        case GLFW_KEY_RIGHT_SHIFT -> "RIGHT_SHIFT";
+                        case GLFW_KEY_LEFT_CONTROL -> "LEFT_CONTROL";
+                        case GLFW_KEY_RIGHT_CONTROL -> "RIGHT_CONTROL";
+                        case GLFW_KEY_LEFT_ALT -> "LEFT_ALT";
+                        case GLFW_KEY_RIGHT_ALT -> "RIGHT_ALT";
+                        case GLFW_KEY_ESCAPE -> "ESCAPE";
+                        default -> null;
+                    };
+                }
+                if (keyName != null) {
+                    if (mods == GLFW_MOD_SHIFT) {
+                        keyName = keyName.toUpperCase();
+                    }
+                    switch (action) {
+                        case GLFW_PRESS -> this.onKeyPressed(keyName);
+                        case GLFW_REPEAT -> this.onKeyRepeated(keyName);
+                        case GLFW_RELEASE -> this.onKeyReleased(keyName);
+                    }
+                }
             }
-            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-                close();
+        });
+        imGuiLayer.mouseButtonCallbacks.add((window1, button, action, mods) -> {
+            switch (action) {
+                case GLFW_PRESS -> this.onMousePressed(button);
+                case GLFW_RELEASE -> this.onMouseReleased(button);
             }
+        });
+        imGuiLayer.scrollCallbacks.add((window1, xoffset, yoffset) -> {
+            this.onScroll(yoffset);
         });
     }
 
@@ -192,6 +227,29 @@ public abstract class App {
      * @param dt elapsed time since last call in seconds
      */
     protected void draw() {}
+
+    protected void onKeyPressed(String keyName) {
+    }
+
+    protected void onKeyRepeated(String keyName) {
+    }
+
+    protected void onKeyReleased(String keyName) {
+    }
+
+    /**
+     * left: 0, right: 1, middle: 2.
+     *
+     * @param button
+     */
+    protected void onMousePressed(int button) {
+    }
+
+    protected void onMouseReleased(int button) {
+    }
+
+    protected void onScroll(double y) {
+    }
 
     protected void beforeClose() {}
 }
