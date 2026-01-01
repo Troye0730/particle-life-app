@@ -145,6 +145,7 @@ public class Main extends App {
     boolean rightAltPressed = false;
 
     // GUI: constants that control how the GUI behaves
+    private long physicsNotReactingThreshold = 3000;  // time in milliseconds
     private int typeCountDiagramStepSize = 100;
     private boolean typeCountDisplayPercentage = false;
 
@@ -963,6 +964,33 @@ public class Main extends App {
                 ImGui.popItemWidth();
             }
             ImGui.end();
+        }
+
+        // PHYSICS NOT REACTING
+        long physicsNotReactingSince = System.currentTimeMillis() - physicsSnapshot.snapshotTime;
+        boolean physicsNotReacting = physicsNotReactingSince > physicsNotReactingThreshold;
+        if (physicsNotReacting) ImGui.openPopup("Not reacting");
+        if (ImGui.beginPopupModal("Not reacting")) {
+            if (!physicsNotReacting) {
+                ImGui.closeCurrentPopup();
+            }
+
+            ImGui.text("Physics didn't react since %4.0f seconds.".formatted(physicsNotReactingSince / 1000.0));
+
+            if (ImGui.button("Reset Physics")) {
+                if (!loop.stop(1000)) {
+                    // physics didn't finish in time
+                    loop.kill();
+                    physics.kill();
+                    physicsSnapshotLoadDistributor.kill();
+                }
+                // re-start loop and re-create physics with initial settings
+                createPhysics();
+                loop = new Loop();
+                loop.start(this::updatePhysics);
+            }
+
+            ImGui.endPopup();
         }
 
         if (showControlsWindow.get()) {

@@ -16,11 +16,18 @@ class PhysicsSnapshot {
     int particleCount;
     int[] typeCount;
 
+    /**
+     * unix timestamp from when this snapshot was taken (milliseconds)
+     */
+    long snapshotTime;
+
     void take(ExtendedPhysics p, LoadDistributor loadDistributor) {
         write(p.particles, loadDistributor);
         settings = p.settings.deepCopy();
         particleCount = p.particles.length;
         typeCount = p.getTypeCount();
+
+        snapshotTime = System.currentTimeMillis();
     }
 
     private void write(Particle[] particles, LoadDistributor loadDistributor) {
