@@ -13,12 +13,16 @@ public class ImGuiLayer {
 
     private long glfwWindow;
 
+    // Mouse cursors provided by GLFW
+    private final long[] mouseCursors = new long[ImGuiMouseCursor.COUNT];
+
     public List<GLFWMouseButtonCallbackI> mouseButtonCallbacks = new ArrayList<>();
     public List<GLFWCharCallbackI> charCallbacks = new ArrayList<>();
     public List<GLFWScrollCallbackI> scrollCallbacks = new ArrayList<>();
     public List<GLFWCursorPosCallbackI> cursorPosCallbacks = new ArrayList<>();
     public List<GLFWKeyCallbackI> keyCallbacks = new ArrayList<>();
     private ImGuiIO io;
+
 
     private final boolean[] mouseDown = new boolean[5];
     private final boolean[] pmouseDown = new boolean[5];// previous state
@@ -70,13 +74,25 @@ public class ImGuiLayer {
         keyMap[GLFW_KEY_Z]           = ImGuiKey.Z;
 
         // ------------------------------------------------------------
+        // Mouse cursors mapping
+        mouseCursors[ImGuiMouseCursor.Arrow] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
+        mouseCursors[ImGuiMouseCursor.TextInput] = glfwCreateStandardCursor(GLFW_IBEAM_CURSOR);
+        mouseCursors[ImGuiMouseCursor.ResizeAll] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
+        mouseCursors[ImGuiMouseCursor.ResizeNS] = glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR);
+        mouseCursors[ImGuiMouseCursor.ResizeEW] = glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR);
+        mouseCursors[ImGuiMouseCursor.ResizeNESW] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
+        mouseCursors[ImGuiMouseCursor.ResizeNWSE] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
+        mouseCursors[ImGuiMouseCursor.Hand] = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+        mouseCursors[ImGuiMouseCursor.NotAllowed] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
+
+        // ------------------------------------------------------------
         // GLFW callbacks to handle user input
 
         glfwSetInputMode(glfwWindow, GLFW_STICKY_MOUSE_BUTTONS, GLFW_TRUE);
         glfwSetInputMode(glfwWindow, GLFW_STICKY_KEYS, GLFW_TRUE);
 
         glfwSetKeyCallback(glfwWindow, (w, key, scancode, action, mods) -> {
-            boolean isDown = action != GLFW_RELEASE;
+            boolean isDown = action == GLFW_PRESS;
             int imGuiKey = keyMap[key];
             if (imGuiKey != ImGuiKey.None) {
                 io.addKeyEvent(imGuiKey, isDown);
@@ -194,7 +210,7 @@ public class ImGuiLayer {
         };
 
         for (int i = 0; i < mouseButtons.length; i++) {
-            mouseDown[i] = glfwGetMouseButton(glfwWindow, mouseButtons[i]) == GLFW_PRESS;
+            mouseDown[i] = glfwGetMouseButton(glfwWindow, mouseButtons[i]) != GLFW_RELEASE;
         }
 
         io.setMouseDown(mouseDown);
@@ -229,6 +245,11 @@ public class ImGuiLayer {
         io.setDisplayFramebufferScale(2f, 2f);
         io.setMousePos((float) mousePosX[0], (float) mousePosY[0]);
         io.setDeltaTime(dt);
+
+        // Update the mouse cursor
+        final int imguiCursor = ImGui.getMouseCursor();
+        glfwSetCursor(glfwWindow, mouseCursors[imguiCursor]);
+        glfwSetInputMode(glfwWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
 
     // If you want to clean a room after yourself - do it by yourself
