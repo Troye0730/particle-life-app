@@ -41,10 +41,7 @@ import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 import static org.lwjgl.opengl.GL11C.*;
-import static org.lwjgl.opengl.GL12C.GL_BGRA;
-import static org.lwjgl.opengl.GL13C.GL_CLAMP_TO_BORDER;
 import static org.lwjgl.opengl.GL13C.GL_MULTISAMPLE;
-import static org.lwjgl.opengl.GL20C.GL_SHADING_LANGUAGE_VERSION;
 import static org.lwjgl.opengl.GL30C.*;
 
 public class Main extends App {
@@ -69,6 +66,7 @@ public class Main extends App {
         }
         main.launch("Particle Life Simulator",
                 main.appSettings.startInFullscreen,
+                ".internal/favicon.png",
                 // request OpenGL version 4.1 (corresponds to "#version 410" in shaders)
                 4, 1
         );

@@ -1,11 +1,21 @@
 package com.particle_life.app;
 
 import com.particle_life.Clock;
+import org.lwjgl.glfw.GLFWErrorCallback;
+import org.lwjgl.glfw.GLFWImage;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
+import org.lwjgl.stb.STBImage;
+import org.lwjgl.system.MemoryStack;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11C.glClearColor;
+import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 public abstract class App {
@@ -28,10 +38,10 @@ public abstract class App {
     private int windowWidth = -1;
     private int windowHeight = -1;
 
-    public void launch(String title, boolean fullscreen,
+    public void launch(String title, boolean fullscreen, String iconPath,
                        int glContextVersionMajor, int glContextVersionMinor) {
 
-        init(title, fullscreen, glContextVersionMajor, glContextVersionMinor);
+        init(title, fullscreen, iconPath, glContextVersionMajor, glContextVersionMinor);
 
         // This line is critical for LWJGL's interoperation with GLFW's
         // OpenGL context, or any context that is managed externally.
@@ -40,15 +50,22 @@ public abstract class App {
         // bindings available for use.
         GL.createCapabilities();
 
+        // Set the clear color
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+
         ImGuiLayer imGuiLayer = new ImGuiLayer(window);
         imGuiLayer.initImGui();
         setCallbacks(imGuiLayer);
+
+        scale = (float) height / 1080;
+        imGuiLayer.scaleGui(scale);
 
         setup();
 
         Clock guiClock = new Clock(1);
 
         while (!glfwWindowShouldClose(window)) {
+
             guiClock.tick();
 
             pmouseX = mouseX;
@@ -68,40 +85,44 @@ public abstract class App {
         glfwFreeCallbacks(window);
         glfwDestroyWindow(window);
 
-        // Terminate GLFW when done
+        // Terminate GLFW and free the error callback
         glfwTerminate();
+        glfwSetErrorCallback(null).free();
 
         beforeClose();
 
         imGuiLayer.destroyImGui();
     }
 
-    private void init(String title, boolean fullscreen,
+    private void init(String title, boolean fullscreen, String iconPath,
                       int glContextVersionMajor, int glContextVersionMinor) {
+        // Setup an error callback. The default implementation
+        // will print the error message in System.err.
+        GLFWErrorCallback.createPrint(System.err).set();
+
         // Initialize GLFW. Most GLFW functions will not work before doing this.
-        if (!glfwInit()) {
+        if (!glfwInit())
             throw new IllegalStateException("Unable to initialize GLFW");
-        }
 
         // Configure GLFW
         glfwDefaultWindowHints(); // optional, the current window hints are already the default
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // the window will stay hidden after creation
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); // the window will be resizable
+        glfwWindowHint(GLFW_SAMPLES, 16);
 
-        // request OpenGL version
+        // request OpenGL version (corresponds to some GLSL version, i.e. "#version XYZ" in shaders)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, glContextVersionMajor);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, glContextVersionMinor);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
         // Create the window
         long monitor = glfwGetPrimaryMonitor();
         GLFWVidMode videoMode = glfwGetVideoMode(monitor);
-        if (videoMode == null) {
-            throw new RuntimeException("Unable to get video mode");
-        }
+        if (videoMode == null) throw new RuntimeException("glfwGetVideoMode() returned null");
         int monitorWidth = videoMode.width();
         int monitorHeight = videoMode.height();
 
-        // Set window size and position
+        // set reasonable defaults for window position and size
         double f = 0.2;
         windowPosX = (int) (f * monitorWidth / 2);
         windowPosY = (int) (f * monitorHeight / 2);
@@ -118,22 +139,61 @@ public abstract class App {
             window = glfwCreateWindow(width, height, title, NULL, NULL);
         }
 
-        if (window == NULL) {
-            throw new IllegalStateException("Failed to create the GLFW window");
+        if (window == NULL) throw new IllegalStateException("Failed to create the GLFW window");
+
+        // set window icon
+        try {
+            setWindowIcon(iconPath);
+        } catch (IOException e) {
+            System.err.println("Failed to set window icon: " + e.getMessage());
+            e.printStackTrace();
+            // just continue without icon
         }
+
+        // Get the thread stack and push a new frame
+        try (MemoryStack stack = stackPush()) {
+
+            // Get the resolution of the primary monitor
+
+            // Center the window
+            glfwSetWindowPos(window, windowPosX, windowPosY);
+        } // the stack frame is popped automatically
 
         // Make the OpenGL context current
         glfwMakeContextCurrent(window);
 
-        // Enable v-sync
-        glfwSwapInterval(1);
+        glfwSwapInterval(1);  // Enable v-sync
 
         // Make the window visible
         glfwShowWindow(window);
     }
 
+    private void setWindowIcon(String iconPath) throws IOException {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            IntBuffer width = stack.mallocInt(1);
+            IntBuffer height = stack.mallocInt(1);
+            IntBuffer channels = stack.mallocInt(1);
+            ByteBuffer pixels = STBImage.stbi_load(iconPath, width, height, channels, 4);
+            if (pixels == null) {
+                throw new IOException("Failed to load window icon: " + STBImage.stbi_failure_reason());
+            }
+            try (GLFWImage imageBuffer = GLFWImage.malloc()) {
+                imageBuffer.set(width.get(0), height.get(0), pixels);
+                nglfwSetWindowIcon(window, 1, imageBuffer.address());
+            }
+        }
+    }
+
     private void setCallbacks(ImGuiLayer imGuiLayer) {
         glfwSetWindowSizeCallback(window, (window1, newWidth, newHeight) -> {
+            //todo: use fame buffer size or window size?
+//            System.out.printf("window size changed: %d %d%n", newWidth, newHeight);
+
+//            int[] frameBufferWidth = new int[1];
+//            int[] frameBufferHeight = new int[1];
+//            glfwGetFramebufferSize(window, frameBufferWidth, frameBufferHeight);
+//            System.out.printf("frame buffer size: %d, %d%n", frameBufferWidth[0], frameBufferHeight[0]);
+
             width = newWidth;
             height = newHeight;
         });
@@ -193,11 +253,13 @@ public abstract class App {
     }
 
     protected void setFullscreen(boolean fullscreen) {
-        if (isFullscreen() == fullscreen) {
-            return;
-        }
+        //todo: this could create problems with multi threading
+
+        if (isFullscreen() == fullscreen) return;
 
         if (fullscreen) {
+            // make fullscreen
+
             // backup window position and size
             int[] xposBuf = new int[1];
             int[] yposBuf = new int[1];
@@ -214,19 +276,25 @@ public abstract class App {
             long monitor = glfwGetPrimaryMonitor();
             GLFWVidMode videoMode = glfwGetVideoMode(monitor);
 
-            // switch to full screen
+            // switch to fullscreen
             width = videoMode.width();
             height = videoMode.height();
             glfwSetWindowMonitor(window, monitor, 0, 0, width, height, GLFW_DONT_CARE);
+
+            glfwSwapInterval(1);  // Enable v-sync
+
         } else {
             // restore last window size and position
             width = windowWidth;
             height = windowHeight;
             glfwSetWindowMonitor(window, NULL, windowPosX, windowPosY, width, height, GLFW_DONT_CARE);
+
+            glfwSwapInterval(1);  // Enable v-sync
         }
     }
 
-    protected void setup() {}
+    protected void setup() {
+    }
 
     protected final void close() {
         glfwSetWindowShouldClose(window, true);
@@ -237,7 +305,8 @@ public abstract class App {
      *
      * @param dt elapsed time since last call in seconds
      */
-    protected void draw() {}
+    protected void draw() {
+    }
 
     protected void onKeyPressed(String keyName) {
     }
@@ -262,5 +331,6 @@ public abstract class App {
     protected void onScroll(double y) {
     }
 
-    protected void beforeClose() {}
+    protected void beforeClose() {
+    }
 }

@@ -158,6 +158,24 @@ public class ImGuiLayer {
         style.setColor(ImGuiCol.Separator, 255, 255, 255, 18);
     }
 
+    /**
+     * scale everything to a readable size
+     *
+     * @param scaleFactor 1.0 for original size
+     */
+    public void scaleGui(float scaleFactor) {
+
+        ImGuiStyle style = ImGui.getStyle();
+        style.scaleAllSizes(scaleFactor);  // scale buttons and other gui elements
+
+        // scale font size
+        ImFontAtlas fontAtlas = io.getFonts();
+        ImFontConfig fontConfig = new ImFontConfig();
+        fontConfig.setSizePixels(13 * scaleFactor); // default font size is 13px
+        fontAtlas.addFontDefault(fontConfig);
+        fontConfig.destroy();
+    }
+
     public void processEvents() {
         processMouseButtonEvents();
     }
