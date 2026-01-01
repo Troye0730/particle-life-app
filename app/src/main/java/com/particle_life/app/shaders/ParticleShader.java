@@ -10,6 +10,7 @@ import static org.lwjgl.opengl.GL20C.*;
 public class ParticleShader {
     public final int shaderProgram;
 
+    private final int timeUniformLocation;
     private final int paletteUniformLocation;
     private final int transformUniformLocation;
     private final int camTopLeftUniformLocation;
@@ -17,6 +18,7 @@ public class ParticleShader {
     private final int sizeUniformLocation;
 
     public final int xAttribLocation;
+    public final int vAttribLocation;
     public final int typeAttribLocation;
 
     private final float[] transform = new float[16];
@@ -31,6 +33,7 @@ public class ParticleShader {
         shaderProgram = ShaderUtil.makeShaderProgram(vertexShaderSource, geometryShaderResource, fragmentShaderResource);
 
         // GET LOCATIONS
+        timeUniformLocation = glGetUniformLocation(shaderProgram, "time");
         paletteUniformLocation = glGetUniformLocation(shaderProgram, "palette");
         transformUniformLocation = glGetUniformLocation(shaderProgram, "transform");
         camTopLeftUniformLocation = glGetUniformLocation(shaderProgram, "camTopLeft");
@@ -38,6 +41,7 @@ public class ParticleShader {
         sizeUniformLocation = glGetUniformLocation(shaderProgram, "size");
 
         xAttribLocation = glGetAttribLocation(shaderProgram, "x");
+        vAttribLocation = glGetAttribLocation(shaderProgram, "v");
         typeAttribLocation = glGetAttribLocation(shaderProgram, "type");
 
         this.blendMode = blendMode;
@@ -48,6 +52,10 @@ public class ParticleShader {
      */
     public void use() {
         glUseProgram(shaderProgram);
+    }
+
+    public void setTime(float value) {
+        glUniform1f(timeUniformLocation, value);
     }
 
     public void setPalette(Color[] palette) {

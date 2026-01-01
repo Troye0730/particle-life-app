@@ -363,6 +363,7 @@ public class Main extends App {
             // set shader variables
             particleShader.use();
 
+            particleShader.setTime(System.nanoTime() / 1000_000_000.0f);
             particleShader.setPalette(getColorsFromPalette(settings.matrix.size(), palettes.getActive()));
             particleShader.setTransform(transform);
 
@@ -575,6 +576,7 @@ public class Main extends App {
 
             particleRenderer.bufferParticleData(shaders.getActive(),
                     physicsSnapshot.positions,
+                    physicsSnapshot.velocities,
                     physicsSnapshot.types);
             settings = physicsSnapshot.settings.deepCopy();
             particleCount = physicsSnapshot.particleCount;
@@ -1140,6 +1142,7 @@ public class Main extends App {
 
         // set shader variables
         particleShader.use();
+        particleShader.setTime(0);
         particleShader.setPalette(getColorsFromPalette(
                 settings.matrix.size(),
                 new NaturalRainbowPalette()));

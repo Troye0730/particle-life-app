@@ -19,6 +19,7 @@ import static org.lwjgl.opengl.GL30.*;
 class ParticleRenderer {
     private int vao;
     private int vboX;
+    private int vboV;
     private int vboT;
 
     /**
@@ -30,10 +31,11 @@ class ParticleRenderer {
     void init() {
         vao = glGenVertexArrays();
         vboX = glGenBuffers();
+        vboV = glGenBuffers();
         vboT = glGenBuffers();
     }
 
-    void bufferParticleData(ParticleShader particleShader, double[] x, int[] types) {
+    void bufferParticleData(ParticleShader particleShader, double[] x, double[] v, int[] types) {
         glBindVertexArray(vao);
 
         // detect change
@@ -49,6 +51,11 @@ class ParticleRenderer {
                 glBindBuffer(GL_ARRAY_BUFFER, vboX);
                 glVertexAttribPointer(particleShader.xAttribLocation, 3, GL_DOUBLE, false, 0, 0);
                 glEnableVertexAttribArray(particleShader.xAttribLocation);
+            }
+            if (particleShader.vAttribLocation != -1) {
+                glBindBuffer(GL_ARRAY_BUFFER, vboV);
+                glVertexAttribPointer(particleShader.vAttribLocation, 3, GL_DOUBLE, false, 0, 0);
+                glEnableVertexAttribArray(particleShader.vAttribLocation);
             }
             if (particleShader.typeAttribLocation != -1) {
                 glBindBuffer(GL_ARRAY_BUFFER, vboT);
@@ -66,6 +73,16 @@ class ParticleRenderer {
                 glBufferData(GL_ARRAY_BUFFER, x, usage);
             } else {
                 glBufferSubData(GL_ARRAY_BUFFER, 0, x);
+            }
+        }
+
+        if (particleShader.vAttribLocation != -1) {
+            glBindBuffer(GL_ARRAY_BUFFER, vboV);
+
+            if (bufferSizeChanged || shaderChanged) {
+                glBufferData(GL_ARRAY_BUFFER, v, usage);
+            } else {
+                glBufferSubData(GL_ARRAY_BUFFER, 0, v);
             }
         }
 
