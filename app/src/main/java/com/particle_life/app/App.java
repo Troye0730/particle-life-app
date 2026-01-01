@@ -184,7 +184,7 @@ public abstract class App {
             }
         });
         imGuiLayer.scrollCallbacks.add((window1, xoffset, yoffset) -> {
-            this.onScroll(yoffset);
+            this.onScroll(yoffset == 0 ? xoffset : yoffset);
         });
     }
 

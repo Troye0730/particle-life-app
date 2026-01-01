@@ -3,7 +3,12 @@ package com.particle_life.app;
 public class AppSettings {
 
     public boolean startInFullscreen = false;
+    public double zoomStepFactor = 1.2;
     public float particleSize = 0.045f;   // particle size (relative to rmax)
+    public boolean keepParticleSizeIndependentOfZoom;
+    public double shiftSmoothness = 0.3;
+    public double zoomSmoothness = 0.3;
+    public double camMovementSpeed = 1.0;
     public boolean showCursor = true;
     public double cursorSize = 0.1;
     public String cursorActionLeft = "Move";

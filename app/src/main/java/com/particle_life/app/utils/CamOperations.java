@@ -1,6 +1,7 @@
 package com.particle_life.app.utils;
 
 import org.joml.Vector2d;
+import org.joml.Vector3d;
 
 /**
  * A utility class for camera operations like dragging and zooming.
@@ -27,6 +28,44 @@ public class CamOperations {
         this.camSize = camSize;
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;
+    }
+
+    /**
+     * Modify the internal cam position by simulating a drag operation by the user.
+     *
+     * @param dragStart The screen coordinates where the drag started.
+     * @param dragStop  The screen coordinates where the drag stopped.
+     */
+    public void dragCam(Vector2d dragStart, Vector2d dragStop) {
+        ScreenCoordinates screen = new ScreenCoordinates(
+                camPos, camSize,
+                screenWidth, screenHeight
+        );
+        Vector3d dragStartWorld = screen.screenToWorld(dragStart);
+        Vector3d dragStopWorld = screen.screenToWorld(dragStop);
+        Vector3d delta = new Vector3d(dragStopWorld).sub(dragStartWorld);
+        camPos.sub(delta.x, delta.y);
+    }
+
+    /**
+     * Change the internal {@link #camSize} while keeping the world position fixed on a certain point on the screen.
+     * This method will modify this object's {@link #camSize} and {@link #camPos} fields.
+     *
+     * @param screenPivotX The x-coordinate of the screen point that should stay fixed.
+     * @param screenPivotY The y-coordinate of the screen point that should stay fixed.
+     * @param newCamSize  The new cam size.
+     */
+    public void zoom(double screenPivotX, double screenPivotY, double newCamSize) {
+        Vector3d worldPivot = new ScreenCoordinates(
+            camPos, camSize,
+            screenWidth, screenHeight
+        ).screenToWorld(screenPivotX, screenPivotY);
+
+        camPos.sub(worldPivot.x, worldPivot.y);
+        camPos.mul(newCamSize / camSize);
+        camPos.add(worldPivot.x, worldPivot.y);
+
+        camSize = newCamSize;
     }
 
     /**

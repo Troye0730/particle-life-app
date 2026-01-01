@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.lwjgl.glfw.GLFW.*;
+
 public class ImGuiLayer {
 
     private long glfwWindow;
@@ -28,6 +29,7 @@ public class ImGuiLayer {
         this.glfwWindow = glfwWindow;
     }
 
+    // Initialize Dear ImGui.
     public void initImGui() {
         // IMPORTANT!!
         // This line is critical for Dear ImGui to work.
@@ -38,6 +40,9 @@ public class ImGuiLayer {
         io = ImGui.getIO();
 
         io.setIniFilename(null); // We don't want to save .ini file
+        io.setConfigFlags(ImGuiConfigFlags.NavEnableKeyboard); // Navigation with keyboard
+        io.setBackendFlags(ImGuiBackendFlags.HasMouseCursors); // Mouse cursors to display while resizing windows etc.
+        io.setBackendPlatformName("imgui_java_impl_glfw");
 
         // ------------------------------------------------------------
         // Keyboard mapping. ImGui will use those indices to peek into the io.KeysDown[] array.
@@ -117,7 +122,7 @@ public class ImGuiLayer {
         });
 
         final ImFontAtlas fontAtlas = io.getFonts();
-        final ImFontConfig fontConfig = new ImFontConfig();
+        final ImFontConfig fontConfig = new ImFontConfig(); // Natively allocated object, should be explicitly destroyed
         fontAtlas.addFontFromFileTTF(".internal/Futura Heavy font.ttf", 16, fontConfig);
         fontAtlas.addFontDefault(); // Add a default font, which is 'ProggyClean.ttf, 13px'
         fontConfig.destroy(); // After all fonts were added we don't need this config anymore
@@ -158,15 +163,16 @@ public class ImGuiLayer {
     }
 
     private void processMouseButtonEvents() {
+
         // copy mouseDown to pmouseDown (save previous state)
         System.arraycopy(mouseDown, 0, pmouseDown, 0, mouseDown.length);
-        
+
         int[] mouseButtons = new int[]{
-            GLFW_MOUSE_BUTTON_1,
-            GLFW_MOUSE_BUTTON_2,
-            GLFW_MOUSE_BUTTON_3,
-            GLFW_MOUSE_BUTTON_4,
-            GLFW_MOUSE_BUTTON_5,
+                GLFW_MOUSE_BUTTON_1,
+                GLFW_MOUSE_BUTTON_2,
+                GLFW_MOUSE_BUTTON_3,
+                GLFW_MOUSE_BUTTON_4,
+                GLFW_MOUSE_BUTTON_5,
         };
 
         for (int i = 0; i < mouseButtons.length; i++) {
@@ -192,6 +198,7 @@ public class ImGuiLayer {
     }
 
     public void setIO(final float dt, int width, int height) {
+
         float[] winWidth = new float[]{width};
         float[] winHeight = new float[]{height};
         double[] mousePosX = new double[]{0};

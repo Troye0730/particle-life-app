@@ -100,7 +100,10 @@ public class Main extends App {
     // particle rendering: controls
     private boolean traces = false;
     private final Vector2d camPos = new Vector2d(0.5, 0.5);  // world center
+    private final Vector2d camPosGoal = new Vector2d(camPos);
     private double camSize = 1.0;
+    private double camSizeGoal = camSize;
+    private final double MAX_CAM_SIZE = 20;
     boolean draggingShift = false;
     boolean leftDraggingParticles = false;  // dragging with left mouse button
     boolean rightDraggingParticles = false;  // dragging with right mouse button
@@ -307,7 +310,8 @@ public class Main extends App {
                 particleShader.setCamTopLeft((float) camBox.left, (float) camBox.top);
             }
             particleShader.setWrap(settings.wrap);
-            particleShader.setSize(appSettings.particleSize * 2 * (float) settings.rmax);
+            particleShader.setSize(appSettings.particleSize * 2 * (float) settings.rmax
+                    * (appSettings.keepParticleSizeIndependentOfZoom ? (float) camSize : 1));
 
             if (!traces) worldTexture.clear(0, 0, 0, 0);
 
@@ -393,6 +397,22 @@ public class Main extends App {
 
         // set cursor position and size
         cursor.position.set(screen.screenToWorld(new Vector2d(mouseX, mouseY)));
+
+        if (draggingShift) {
+            new CamOperations(camPos, camSize, width, height)
+                    .dragCam(new Vector2d(pmouseX, pmouseY), new Vector2d(mouseX, mouseY));
+            camPosGoal.set(camPos);  // don't use smoothing while dragging
+        }
+
+        double camMovementStepSize = appSettings.camMovementSpeed * camSize;
+        camMovementStepSize *= renderClock.getDtMillis() / 1000.0;  // keep constant speed regardless of framerate
+        if (leftPressed || aPressed) camPosGoal.add(-camMovementStepSize, 0.0);
+        if (rightPressed || dPressed) camPosGoal.add(camMovementStepSize, 0.0);
+        if (upPressed || wPressed) camPosGoal.add(0.0, -camMovementStepSize);
+        if (downPressed || sPressed) camPosGoal.add(0.0, camMovementStepSize);
+
+        camPos.lerp(camPosGoal, appSettings.shiftSmoothness);
+        camSize = MathUtils.lerp(camSize, camSizeGoal, appSettings.zoomSmoothness);
 
         // count particles under cursor
         {
@@ -835,6 +855,48 @@ public class Main extends App {
                 ImGuiUtils.renderCombo("Palette", palettes);
                 ImGuiUtils.helpMarker("Color of particles");
 
+                ImGui.text("Particle Size:");
+                ImGuiUtils.helpMarker("[shift+scroll]" +
+                        "\nHow large the particles are displayed relative to rmax.");
+                float[] particleSizeSliderValue = new float[]{appSettings.particleSize};
+                if (ImGui.sliderFloat("##particle size", particleSizeSliderValue, 0.001f, 1f)) {
+                    appSettings.particleSize = particleSizeSliderValue[0];
+                }
+                ImGui.sameLine();
+                if (ImGui.checkbox("Zoom-Independent", appSettings.keepParticleSizeIndependentOfZoom)) {
+                    appSettings.keepParticleSizeIndependentOfZoom ^= true;
+                }
+
+                if (ImGui.checkbox("Traces [t]", traces)) {
+                    traces ^= true;
+                }
+
+                if (ImGui.treeNode("Camera Settings")) {
+                    {
+                        float[] inputValue = new float[]{(float) appSettings.camMovementSpeed};
+                        if (ImGui.sliderFloat("Cam Speed", inputValue, 0.0f, 2.0f, "%0.2f")) {
+                            appSettings.camMovementSpeed = inputValue[0];
+                        }
+                    }
+
+                    {
+                        float[] inputValue = new float[]{(float) (1.0 - appSettings.zoomSmoothness)};
+                        if (ImGui.sliderFloat("Cam Smoothing", inputValue, 0.0f, 1.0f, "%0.2f")) {
+                            appSettings.zoomSmoothness = 1.0 - inputValue[0];
+                            appSettings.shiftSmoothness = 1.0 - inputValue[0];
+                        }
+                    }
+
+                    {
+                        float[] inputValue = new float[]{(float) (appSettings.zoomStepFactor - 1) * 100};
+                        if (ImGui.sliderFloat("Zoom Step", inputValue, 0.0f, 100.0f, "%.1f%%", ImGuiSliderFlags.Logarithmic)) {
+                            appSettings.zoomStepFactor = 1 + inputValue[0] * 0.01;
+                        }
+                    }
+
+                    ImGui.treePop();
+                }
+
                 ImGui.popItemWidth();
             }
             ImGui.end();
@@ -844,6 +906,10 @@ public class Main extends App {
             ImGui.setNextWindowPos(width / 2f, height / 2f, ImGuiCond.FirstUseEver, 0.5f, 0.5f);
             if (ImGui.begin("Controls", showControlsWindow, ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize)) {
                 ImGui.text("""
+                        [+], [=]: zoom in
+                        [-]: zoom out
+                        [z]: reset zoom
+                        [Z]: reset zoom (fit window)
                         [ESCAPE]: hide / show GUI GUI
                         [g]: show / hide graphics settings
                         [SPACE]: pause physics
@@ -921,8 +987,10 @@ public class Main extends App {
 
             if (ImGui.beginMenu("Zoom")) {
                 if (ImGui.menuItem("100%", "z")) {
+                    resetCamera(false);
                 }
                 if (ImGui.menuItem("Fit", "Z")) {
+                    resetCamera(true);
                 }
                 ImGui.endMenu();
             }
@@ -932,6 +1000,17 @@ public class Main extends App {
             }
 
             ImGui.endMenu();
+        }
+    }
+
+    private void resetCamera(boolean fit) {
+        if (settings.wrap) camPos.sub(Math.floor(camPos.x), Math.floor(camPos.y));  // remove periodic offset
+        camPosGoal.set(0.5, 0.5);  // world center
+        camSizeGoal = 1;
+
+        if (fit) {
+            // zoom to fit larger dimension
+            camSizeGoal = (double) Math.min(width, height) / Math.max(width, height);
         }
     }
 
@@ -984,6 +1063,13 @@ public class Main extends App {
             case "ESCAPE" -> showGui.set(!showGui.get());
             case "f" -> setFullscreen(!isFullscreen());
             case "t" -> traces ^= true;
+            case "+", "=" -> camSizeGoal /= Math.pow(appSettings.zoomStepFactor, 2);// more steps than when scrolling
+            case "-" -> {
+                camSizeGoal *= Math.pow(appSettings.zoomStepFactor, 2);
+                camSizeGoal = Math.min(camSizeGoal, MAX_CAM_SIZE);
+            }
+            case "z" -> resetCamera(false);
+            case "Z" -> resetCamera(true);
             case "p" -> loop.enqueue(physics::setPositions);
             case "c" -> loop.enqueue(() -> {
                 TypeSetter previousTypeSetter = physics.typeSetter;
@@ -1039,6 +1125,42 @@ public class Main extends App {
             leftDraggingParticles = false;
         } else if (button == 1) {  // right mouse button
             rightDraggingParticles = false;
+        }
+    }
+
+    @Override
+    protected void onScroll(double y) {
+
+        boolean controlPressed = leftControlPressed || rightControlPressed;
+        boolean shiftPressed = leftShiftPressed || rightShiftPressed;
+        boolean altPressed = leftAltPressed || rightAltPressed;
+
+        if (controlPressed && shiftPressed) {
+            // change time step
+            appSettings.dt *= Math.pow(1.2, -y);
+            appSettings.dt = MathUtils.clamp(appSettings.dt, 0.00f, 0.1f);
+            // deactivate auto dt
+            appSettings.autoDt = false;
+        } else if (shiftPressed) {
+            // change particle size
+            appSettings.particleSize *= (float) Math.pow(1.2, -y);
+        } else if (controlPressed) {
+            // change cursor size
+            cursor.size *= Math.pow(1.2, -y);
+        } else if (altPressed) {
+            // change rmax
+            loop.enqueue(() -> physics.settings.rmax *= Math.pow(1.2, -y));
+        } else {
+            // change camera zoom
+
+            double factor = Math.pow(appSettings.zoomStepFactor, -y);
+
+            CamOperations cam = new CamOperations(camPosGoal, camSizeGoal, width, height);
+            cam.zoom(
+                    mouseX, mouseY, // zoom in on mouse
+                    Math.min(camSizeGoal * factor, MAX_CAM_SIZE)
+            );  // this already modifies camPosGoal
+            camSizeGoal = cam.camSize;
         }
     }
 
